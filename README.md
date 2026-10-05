@@ -108,7 +108,9 @@ apart, the later change wins. Give each setting its own name.
 
 Apps can also skip the command and speak lines of JSON to the daemon's
 socket at `~/.local/share/crosstalk/sock`: the first line is the command as
-an op, such as `{"op":"listen","name":"tagteam"}`.
+an op, such as `{"op":"listen","name":"tagteam"}`. `listen` and `watch`
+carry on when the daemon restarts, as it does for an update, but an app on
+the socket has to connect again itself.
 
 Messages and values are limited to 256 KB.
 

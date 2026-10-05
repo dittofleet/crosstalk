@@ -31,26 +31,57 @@ func Listen(args []string) error {
 	}
 	name, command := args[0], args[min(2, len(args)):]
 
+	// Replies come from stdin or from several handlers at once, and go to
+	// whichever connection is current. One meant for a message from before
+	// the daemon restarted is ignored there: the daemon already told its
+	// sender that nobody answered.
+	l := &listening{}
+	if len(command) == 0 {
+		go l.relayReplies()
+	}
+	return stayConnected(restartPatience, func() error { return l.once(name, command) })
+}
+
+type listening struct {
+	mu   sync.Mutex
+	conn net.Conn
+}
+
+// Write sends one whole line to the current connection, or drops it when
+// there is none.
+func (l *listening) Write(line []byte) (int, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.conn == nil {
+		return len(line), nil
+	}
+	return l.conn.Write(line)
+}
+
+func (l *listening) setConn(c net.Conn) {
+	l.mu.Lock()
+	l.conn = c
+	l.mu.Unlock()
+}
+
+// once listens until the daemon closes the connection.
+func (l *listening) once(name string, command []string) error {
 	c, lines, err := connect(wire.Request{Op: "listen", Name: name})
 	if err != nil {
 		return err
 	}
-	defer c.Close()
 	if _, err := answer(lines); err != nil {
+		c.Close()
 		return err
 	}
+	l.setConn(c)
+	// Closed first: a reply stuck writing to it holds the lock setConn
+	// needs, and only the close lets it go.
+	defer func() {
+		c.Close()
+		l.setConn(nil)
+	}()
 
-	// Replies come from stdin or from several handlers at once.
-	var wmu sync.Mutex
-	reply := func(r wire.Reply) {
-		wmu.Lock()
-		defer wmu.Unlock()
-		wire.WriteLine(c, r)
-	}
-
-	if len(command) == 0 {
-		go relayReplies(c, &wmu)
-	}
 	for lines.Scan() {
 		if len(command) == 0 {
 			fmt.Println(lines.Text())
@@ -63,21 +94,19 @@ func Listen(args []string) error {
 		go func() {
 			r := handle(command, msg)
 			if msg.WantsReply {
-				reply(r)
+				wire.WriteLine(l, r)
 			}
 		}()
 	}
-	return errors.New("the crosstalk daemon closed the connection")
+	return errDaemonGone
 }
 
 // relayReplies passes the lines typed or piped into stdin to the daemon.
 // Stdin ending does not end the listening.
-func relayReplies(c net.Conn, wmu *sync.Mutex) {
+func (l *listening) relayReplies() {
 	in := wire.NewScanner(os.Stdin)
 	for in.Scan() {
-		wmu.Lock()
-		c.Write(append(bytes.Clone(in.Bytes()), '\n'))
-		wmu.Unlock()
+		l.Write(append(bytes.Clone(in.Bytes()), '\n'))
 	}
 }
 

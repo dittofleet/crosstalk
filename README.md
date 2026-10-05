@@ -97,10 +97,12 @@ Plain `listen` prints each message as a line of JSON and takes replies as
 lines on stdin, `{"id": <its id>, "body": <any JSON>}`.
 
 Lines with a `crosstalk` key are notices from the daemon, not messages.
-`{"crosstalk":{"hub":"connected"}}` comes each time the daemon connects to
-the hub, for example after the Mac wakes or changes network. Messages sent
-while it was away never arrive, so this is the moment for an app to catch
-up. `--run` does not run the command for a notice.
+`{"crosstalk":{"hub":"connected"}}` comes when messages can reach the
+listener again after a time when they could not: when it starts listening,
+when the daemon has restarted, and each time the daemon connects to the hub
+again, for example after the Mac wakes or changes network. Messages sent in
+between never arrive, so this is the moment for an app to catch up. `--run`
+does not run the command for a notice.
 
 **Posted values** are kept by the daemon, so they outlast the app that
 posted them, and each Mac keeps the last one it saw from the others, so

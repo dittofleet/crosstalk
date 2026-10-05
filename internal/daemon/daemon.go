@@ -374,7 +374,7 @@ func (d *Daemon) session(ctx context.Context) error {
 	go d.keepAlive(ctx, c, &lastHeard)
 
 	d.mu.Lock()
-	d.conn, d.hub, d.listed = c, wire.HubConnected, false
+	d.conn, d.hub = c, wire.HubConnected
 	d.mu.Unlock()
 	defer d.dropped(c)
 
@@ -416,7 +416,7 @@ func (d *Daemon) keepAlive(ctx context.Context, c *websocket.Conn, lastHeard *at
 func (d *Daemon) dropped(c *websocket.Conn) {
 	d.mu.Lock()
 	if d.conn == c {
-		d.conn, d.hub = nil, wire.HubConnecting
+		d.conn, d.hub, d.listed = nil, wire.HubConnecting, false
 	}
 	for i := range d.devices {
 		d.devices[i].Online = false
@@ -525,7 +525,7 @@ func (d *Daemon) fromHub(data []byte) {
 			}
 		}
 		for _, l := range listeners {
-			l.write(wire.Notice{Crosstalk: wire.Event{Hub: wire.HubConnected}})
+			l.write(hubBack)
 		}
 	case "nack":
 		if ch := d.takePending(frame.Ref); ch != nil {

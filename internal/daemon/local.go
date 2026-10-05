@@ -20,6 +20,10 @@ import (
 // ErrRunning is returned by Run when a daemon already serves this user.
 var ErrRunning = errors.New("the crosstalk daemon is already running")
 
+// hubBack tells a listener that messages can reach it through the hub,
+// after a time when they could not.
+var hubBack = wire.Notice{Crosstalk: wire.Event{Hub: wire.HubConnected}}
+
 // A listener that cannot take a line for this long is treated as gone, so
 // one stuck program cannot hold up every message from the hub.
 const deliverTimeout = 5 * time.Second
@@ -263,6 +267,10 @@ func (d *Daemon) listen(c net.Conn, lines *bufio.Scanner, req wire.Request) {
 	if !taken {
 		d.listeners[req.Name] = l
 	}
+	// Messages could not reach the program before now, so it hears that
+	// the hub is there, as it would have on the hub coming back. If the
+	// hub has yet to list the devices, it hears when it does.
+	listed := d.listed
 	d.mu.Unlock()
 	if taken {
 		l.wmu.Unlock()
@@ -283,6 +291,9 @@ func (d *Daemon) listen(c net.Conn, lines *bufio.Scanner, req wire.Request) {
 	}()
 
 	err := wire.WriteLine(c, wire.Response{OK: true})
+	if err == nil && listed {
+		err = wire.WriteLine(c, hubBack)
+	}
 	l.wmu.Unlock()
 	if err != nil {
 		return

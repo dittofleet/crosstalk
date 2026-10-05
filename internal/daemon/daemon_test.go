@@ -471,6 +471,11 @@ func TestAListenerHearsWhenTheHubIsBack(t *testing.T) {
 	if !lines.Scan() || lines.Text() != `{"ok":true}` {
 		t.Fatalf("listen: %s", lines.Text())
 	}
+	// Messages could not reach it before it listened, as if the hub had
+	// been away.
+	if !lines.Scan() || lines.Text() != `{"crosstalk":{"hub":"connected"}}` {
+		t.Fatalf("on listening: %s", lines.Text())
+	}
 
 	machines["lychee"].daemon.reconnect("a test")
 	eventually(t, "a second connection", func() bool { return hub.connected("lychee") >= 2 })
@@ -492,6 +497,35 @@ func TestAListenerHearsWhenTheHubIsBack(t *testing.T) {
 	var msg wire.Delivery
 	if !lines.Scan() || json.Unmarshal(lines.Bytes(), &msg) != nil || msg.From != "macbook" {
 		t.Fatalf("after the notice: %s", lines.Text())
+	}
+}
+
+func TestAListenerFromBeforeTheHubListsTheDevicesHearsOnce(t *testing.T) {
+	key, _ := secret.NewKey()
+	d, err := New(&config.Config{Hub: "http://localhost", Name: "lychee", ID: "lychee-0000000000000000", Key: key})
+	if err != nil {
+		t.Fatal(err)
+	}
+	app, conn := net.Pipe()
+	t.Cleanup(func() { app.Close() })
+	go d.handle(context.Background(), conn)
+	wire.WriteLine(app, wire.Request{Op: "listen", Name: "tagteam"})
+	lines := wire.NewScanner(app)
+	app.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if !lines.Scan() || lines.Text() != `{"ok":true}` {
+		t.Fatalf("listen: %s", lines.Text())
+	}
+
+	list := []byte(`{"t":"devices","devices":[{"name":"lychee","online":true}]}`)
+	go d.fromHub(list)
+	if !lines.Scan() || lines.Text() != `{"crosstalk":{"hub":"connected"}}` {
+		t.Fatalf("on the list: %s", lines.Text())
+	}
+	// The list comes again whenever a device comes or goes.
+	go d.fromHub(list)
+	app.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+	if lines.Scan() {
+		t.Fatalf("on the list again: %s", lines.Text())
 	}
 }
 

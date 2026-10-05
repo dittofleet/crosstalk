@@ -219,9 +219,11 @@ type Notice struct {
 	Crosstalk Event `json:"crosstalk"`
 }
 
-// Event is what a Notice says. Hub is HubConnected each time the daemon
-// connects to the hub: messages sent while it was not connected never
-// arrive, so a listener may want to catch up on what it missed.
+// Event is what a Notice says. Hub is HubConnected when messages can reach a
+// listener through the hub again: once it is listening and the daemon is
+// connected, and each time the daemon connects again after that. Messages
+// sent in between never arrive, so a listener may want to catch up on what
+// it missed.
 type Event struct {
 	Hub string `json:"hub"`
 }

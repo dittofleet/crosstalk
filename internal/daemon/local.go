@@ -217,12 +217,20 @@ func (l *listener) deliver(from string, msg wire.Sealed) bool {
 	if closed {
 		return false
 	}
+	if !l.write(wire.Delivery{ID: msg.ID, From: from, Name: msg.Name, Body: body, WantsReply: msg.Reply}) {
+		l.take(msg.ID)
+		return false
+	}
+	return true
+}
+
+// write sends the program one line, and reports whether it got there.
+func (l *listener) write(line any) bool {
 	l.wmu.Lock()
 	l.conn.SetWriteDeadline(time.Now().Add(deliverTimeout))
-	err := wire.WriteLine(l.conn, wire.Delivery{ID: msg.ID, From: from, Name: msg.Name, Body: body, WantsReply: msg.Reply})
+	err := wire.WriteLine(l.conn, line)
 	l.wmu.Unlock()
 	if err != nil {
-		l.take(msg.ID)
 		// Ends the read in listen, which takes the listener off its name.
 		l.conn.Close()
 		return false

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -158,6 +159,9 @@ func (m *machine) listen(name string, reply func(wire.Delivery) wire.Reply) {
 	}
 	go func() {
 		for lines.Scan() {
+			if strings.HasPrefix(lines.Text(), `{"crosstalk":`) {
+				continue
+			}
 			var msg wire.Delivery
 			json.Unmarshal(lines.Bytes(), &msg)
 			r := reply(msg)
@@ -456,6 +460,30 @@ func TestMovingToAnotherNetworkRemakesTheConnection(t *testing.T) {
 	eventually(t, "a send working again", func() bool { return sendWorks(machines["macbook"]) })
 	if n := hub.connected("macbook"); n != 2 {
 		t.Fatalf("connected %d times for one change of network", n)
+	}
+}
+
+func TestAListenerHearsWhenTheHubIsBack(t *testing.T) {
+	hub, machines := start(t)
+	_, lines := machines["lychee"].dial(wire.Request{Op: "listen", Name: "tagteam"})
+	if !lines.Scan() || lines.Text() != `{"ok":true}` {
+		t.Fatalf("listen: %s", lines.Text())
+	}
+
+	machines["lychee"].daemon.reconnect("a test")
+	eventually(t, "a second connection", func() bool { return hub.connected("lychee") >= 2 })
+	if !lines.Scan() || lines.Text() != `{"crosstalk":{"hub":"connected"}}` {
+		t.Fatalf("after reconnecting: %s", lines.Text())
+	}
+
+	// And messages still come after it.
+	eventually(t, "macbook sending to lychee", func() bool {
+		res := machines["macbook"].ask(wire.Request{Op: "send", To: "*", Name: "tagteam"})
+		return slices.Contains(res.Sent, "lychee")
+	})
+	var msg wire.Delivery
+	if !lines.Scan() || json.Unmarshal(lines.Bytes(), &msg) != nil || msg.From != "macbook" {
+		t.Fatalf("after the notice: %s", lines.Text())
 	}
 }
 

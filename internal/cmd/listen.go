@@ -21,6 +21,8 @@ const listenUsage = `usage: crosstalk listen <name>
 //
 // Plain, it prints each message as a line of JSON and takes replies as
 // lines of JSON on stdin: {"id": <the message's id>, "body": <any JSON>}.
+// It also prints the daemon's notices, the lines with a "crosstalk" key,
+// such as {"crosstalk":{"hub":"connected"}}.
 //
 // With --run it runs the command once per message, with the message's body
 // on stdin and CROSSTALK_FROM and CROSSTALK_NAME set. What the command
@@ -87,10 +89,15 @@ func (l *listening) once(name string, command []string) error {
 			fmt.Println(lines.Text())
 			continue
 		}
-		var msg wire.Delivery
-		if json.Unmarshal(lines.Bytes(), &msg) != nil {
+		var line struct {
+			wire.Delivery
+			Crosstalk json.RawMessage `json:"crosstalk"`
+		}
+		// A notice is not a message, so there is nothing to run.
+		if json.Unmarshal(lines.Bytes(), &line) != nil || line.Crosstalk != nil {
 			continue
 		}
+		msg := line.Delivery
 		go func() {
 			r := handle(command, msg)
 			if msg.WantsReply {

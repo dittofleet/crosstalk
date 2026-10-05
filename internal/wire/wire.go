@@ -210,6 +210,20 @@ type Delivery struct {
 	WantsReply bool            `json:"wantsReply"`
 }
 
+// Notice is a line the daemon writes to a listener about itself rather than
+// a message. Its one key, "crosstalk", is never a Delivery's, and is kept
+// for these.
+type Notice struct {
+	Crosstalk Event `json:"crosstalk"`
+}
+
+// Event is what a Notice says. Hub is HubConnected each time the daemon
+// connects to the hub: messages sent while it was not connected never
+// arrive, so a listener may want to catch up on what it missed.
+type Event struct {
+	Hub string `json:"hub,omitempty"`
+}
+
 // Reply is a line a listener writes back to answer a Delivery.
 type Reply struct {
 	ID      string          `json:"id"`

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	mrand "math/rand/v2"
 	"net"
 	"net/http"
@@ -370,8 +371,15 @@ func (d *Daemon) session(ctx context.Context) error {
 
 	d.mu.Lock()
 	d.conn, d.hub = c, wire.HubConnected
+	listeners := slices.Collect(maps.Values(d.listeners))
 	d.mu.Unlock()
 	defer d.dropped(c)
+	// Apart, so a listener slow to take it does not hold up the hub.
+	go func() {
+		for _, l := range listeners {
+			l.write(wire.Notice{Crosstalk: wire.Event{Hub: wire.HubConnected}})
+		}
+	}()
 
 	for {
 		kind, data, err := c.Read(ctx)

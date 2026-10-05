@@ -159,11 +159,11 @@ func (m *machine) listen(name string, reply func(wire.Delivery) wire.Reply) {
 	}
 	go func() {
 		for lines.Scan() {
-			if strings.HasPrefix(lines.Text(), `{"crosstalk":`) {
-				continue
-			}
 			var msg wire.Delivery
 			json.Unmarshal(lines.Bytes(), &msg)
+			if msg.Crosstalk != nil {
+				continue
+			}
 			r := reply(msg)
 			r.ID = msg.ID
 			wire.WriteLine(c, r)

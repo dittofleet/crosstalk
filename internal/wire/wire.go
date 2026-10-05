@@ -208,6 +208,8 @@ type Delivery struct {
 	Name       string          `json:"name"`
 	Body       json.RawMessage `json:"body"`
 	WantsReply bool            `json:"wantsReply"`
+	// Crosstalk is set when the line is a Notice rather than a message.
+	Crosstalk *Event `json:"crosstalk,omitempty"`
 }
 
 // Notice is a line the daemon writes to a listener about itself rather than
@@ -221,7 +223,7 @@ type Notice struct {
 // connects to the hub: messages sent while it was not connected never
 // arrive, so a listener may want to catch up on what it missed.
 type Event struct {
-	Hub string `json:"hub,omitempty"`
+	Hub string `json:"hub"`
 }
 
 // Reply is a line a listener writes back to answer a Delivery.

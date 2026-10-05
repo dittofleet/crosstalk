@@ -89,15 +89,11 @@ func (l *listening) once(name string, command []string) error {
 			fmt.Println(lines.Text())
 			continue
 		}
-		var line struct {
-			wire.Delivery
-			Crosstalk json.RawMessage `json:"crosstalk"`
-		}
+		var msg wire.Delivery
 		// A notice is not a message, so there is nothing to run.
-		if json.Unmarshal(lines.Bytes(), &line) != nil || line.Crosstalk != nil {
+		if json.Unmarshal(lines.Bytes(), &msg) != nil || msg.Crosstalk != nil {
 			continue
 		}
-		msg := line.Delivery
 		go func() {
 			r := handle(command, msg)
 			if msg.WantsReply {

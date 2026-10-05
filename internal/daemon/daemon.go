@@ -374,12 +374,11 @@ func (d *Daemon) session(ctx context.Context) error {
 	listeners := slices.Collect(maps.Values(d.listeners))
 	d.mu.Unlock()
 	defer d.dropped(c)
-	// Apart, so a listener slow to take it does not hold up the hub.
-	go func() {
-		for _, l := range listeners {
-			l.write(wire.Notice{Crosstalk: wire.Event{Hub: wire.HubConnected}})
-		}
-	}()
+	// Apart, so a listener slow to take it holds up neither the hub nor
+	// the other listeners.
+	for _, l := range listeners {
+		go l.write(wire.Notice{Crosstalk: wire.Event{Hub: wire.HubConnected}})
+	}
 
 	for {
 		kind, data, err := c.Read(ctx)

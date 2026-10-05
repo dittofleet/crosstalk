@@ -20,6 +20,10 @@ import (
 // ErrRunning is returned by Run when a daemon already serves this user.
 var ErrRunning = errors.New("the crosstalk daemon is already running")
 
+// hubBack tells a listener that messages can reach it through the hub,
+// after a time when they could not.
+var hubBack = wire.Notice{Crosstalk: wire.Event{Hub: wire.HubConnected}}
+
 // A listener that cannot take a line for this long is treated as gone, so
 // one stuck program cannot hold up every message from the hub.
 const deliverTimeout = 5 * time.Second
@@ -217,12 +221,19 @@ func (l *listener) deliver(from string, msg wire.Sealed) bool {
 	if closed {
 		return false
 	}
+	return l.write(wire.Delivery{ID: msg.ID, From: from, Name: msg.Name, Body: body, WantsReply: msg.Reply}, msg.ID)
+}
+
+// write sends the program one line, and reports whether it got there. id is
+// the delivery's, if the line is one, to take back should it not arrive.
+func (l *listener) write(line any, id string) bool {
 	l.wmu.Lock()
 	l.conn.SetWriteDeadline(time.Now().Add(deliverTimeout))
-	err := wire.WriteLine(l.conn, wire.Delivery{ID: msg.ID, From: from, Name: msg.Name, Body: body, WantsReply: msg.Reply})
+	err := wire.WriteLine(l.conn, line)
 	l.wmu.Unlock()
 	if err != nil {
-		l.take(msg.ID)
+		// Before the close, so that listen does not answer it as well.
+		l.take(id)
 		// Ends the read in listen, which takes the listener off its name.
 		l.conn.Close()
 		return false
@@ -255,6 +266,10 @@ func (d *Daemon) listen(c net.Conn, lines *bufio.Scanner, req wire.Request) {
 	if !taken {
 		d.listeners[req.Name] = l
 	}
+	// Messages could not reach the program before now, so it hears that
+	// the hub is there, as it would have on the hub coming back. If the
+	// hub has yet to list the devices, it hears when it does.
+	connected := d.hub == wire.HubConnected
 	d.mu.Unlock()
 	if taken {
 		l.wmu.Unlock()
@@ -274,7 +289,11 @@ func (d *Daemon) listen(c net.Conn, lines *bufio.Scanner, req wire.Request) {
 		}
 	}()
 
+	c.SetWriteDeadline(time.Now().Add(deliverTimeout))
 	err := wire.WriteLine(c, wire.Response{OK: true})
+	if err == nil && connected {
+		err = wire.WriteLine(c, hubBack)
+	}
 	l.wmu.Unlock()
 	if err != nil {
 		return

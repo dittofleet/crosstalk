@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
 	mrand "math/rand/v2"
 	"net"
 	"net/http"
@@ -369,7 +370,10 @@ func (d *Daemon) session(ctx context.Context) error {
 	go d.keepAlive(ctx, c, &lastHeard)
 
 	d.mu.Lock()
-	d.conn, d.hub = c, wire.HubConnected
+	// Connected is for once the hub has sent its list of devices. Until
+	// then it may yet turn this machine away, and every other machine
+	// looks offline.
+	d.conn = c
 	d.mu.Unlock()
 	defer d.dropped(c)
 
@@ -502,6 +506,13 @@ func (d *Daemon) fromHub(data []byte) {
 		}
 		d.devices = frame.Devices
 		d.forgetRemoved()
+		// The connection is ready for an app to catch up on what it
+		// missed while there was none.
+		var listeners []*listener
+		if d.hub != wire.HubConnected {
+			d.hub = wire.HubConnected
+			listeners = slices.Collect(maps.Values(d.listeners))
+		}
 		d.mu.Unlock()
 		// A device that has just connected may have missed changes, and
 		// made some. After this daemon reconnects, that is every device. It
@@ -512,6 +523,14 @@ func (d *Daemon) fromHub(data []byte) {
 				d.sendHave(device.Name, true)
 			}
 		}
+		// All at once, so listeners slow to take it hold up the hub for
+		// deliverTimeout at most. Waited for, so no message from the hub
+		// reaches a listener ahead of it.
+		var wg sync.WaitGroup
+		for _, l := range listeners {
+			wg.Go(func() { l.write(hubBack, "") })
+		}
+		wg.Wait()
 	case "nack":
 		if ch := d.takePending(frame.Ref); ch != nil {
 			ch <- wire.Sealed{Error: wire.ErrUnreachable}

@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/dittofleet/crosstalk/internal/wire"
 )
@@ -118,19 +117,8 @@ func Watch(args []string) error {
 	if len(args) != 1 {
 		return errors.New("usage: crosstalk watch <name>")
 	}
-	for first := true; ; first = false {
-		err := watchOnce(args[0])
-		// A refusal will not change by asking again, and a daemon that
-		// was never there is for the user to start.
-		var failure *Failure
-		if errors.As(err, &failure) || (first && err != nil && !errors.Is(err, errWatchEnded)) {
-			return err
-		}
-		time.Sleep(time.Second)
-	}
+	return stayConnected(restartPatience, func() error { return watchOnce(args[0]) })
 }
-
-var errWatchEnded = errors.New("the crosstalk daemon closed the connection")
 
 func watchOnce(name string) error {
 	c, lines, err := connect(wire.Request{Op: "watch", Name: name})
@@ -144,7 +132,7 @@ func watchOnce(name string) error {
 	for lines.Scan() {
 		fmt.Println(lines.Text())
 	}
-	return errWatchEnded
+	return errDaemonGone
 }
 
 func printLine(v any) {

@@ -465,7 +465,9 @@ func TestMovingToAnotherNetworkRemakesTheConnection(t *testing.T) {
 
 func TestAListenerHearsWhenTheHubIsBack(t *testing.T) {
 	hub, machines := start(t)
-	_, lines := machines["lychee"].dial(wire.Request{Op: "listen", Name: "tagteam"})
+	c, lines := machines["lychee"].dial(wire.Request{Op: "listen", Name: "tagteam"})
+	// So a notice that never comes fails the test rather than hanging it.
+	c.SetReadDeadline(time.Now().Add(5 * time.Second))
 	if !lines.Scan() || lines.Text() != `{"ok":true}` {
 		t.Fatalf("listen: %s", lines.Text())
 	}
@@ -474,6 +476,12 @@ func TestAListenerHearsWhenTheHubIsBack(t *testing.T) {
 	eventually(t, "a second connection", func() bool { return hub.connected("lychee") >= 2 })
 	if !lines.Scan() || lines.Text() != `{"crosstalk":{"hub":"connected"}}` {
 		t.Fatalf("after reconnecting: %s", lines.Text())
+	}
+	// By then the other machines are back on the list, so a catch-up that
+	// sends to them reaches them.
+	devices := machines["lychee"].ask(wire.Request{Op: "devices"}).Devices
+	if i := slices.IndexFunc(devices, func(d wire.Device) bool { return d.Name == "macbook" }); i < 0 || !devices[i].Online {
+		t.Fatalf("devices at the notice: %+v", devices)
 	}
 
 	// And messages still come after it.

@@ -102,6 +102,10 @@ type Daemon struct {
 	conn    *websocket.Conn // nil while not connected
 	hub     string
 	devices []wire.Device
+	// Whether the hub has sent its list of devices on this connection.
+	// Until it has, it may yet turn this machine away, and every other
+	// machine looks offline.
+	listed bool
 	// Programs on this machine listening on a name.
 	listeners map[string]*listener
 	// Sends from this machine that are waiting for a reply, by message id.
@@ -370,15 +374,9 @@ func (d *Daemon) session(ctx context.Context) error {
 	go d.keepAlive(ctx, c, &lastHeard)
 
 	d.mu.Lock()
-	d.conn, d.hub = c, wire.HubConnected
-	listeners := slices.Collect(maps.Values(d.listeners))
+	d.conn, d.hub, d.listed = c, wire.HubConnected, false
 	d.mu.Unlock()
 	defer d.dropped(c)
-	// Apart, so a listener slow to take it holds up neither the hub nor
-	// the other listeners.
-	for _, l := range listeners {
-		go l.write(wire.Notice{Crosstalk: wire.Event{Hub: wire.HubConnected}})
-	}
 
 	for {
 		kind, data, err := c.Read(ctx)
@@ -509,6 +507,13 @@ func (d *Daemon) fromHub(data []byte) {
 		}
 		d.devices = frame.Devices
 		d.forgetRemoved()
+		// The connection is ready for an app to catch up on what it
+		// missed while there was none.
+		var listeners []*listener
+		if !d.listed {
+			d.listed = true
+			listeners = slices.Collect(maps.Values(d.listeners))
+		}
 		d.mu.Unlock()
 		// A device that has just connected may have missed changes, and
 		// made some. After this daemon reconnects, that is every device. It
@@ -518,6 +523,9 @@ func (d *Daemon) fromHub(data []byte) {
 			if device.Online && !device.Self && !was[device.Name] {
 				d.sendHave(device.Name, true)
 			}
+		}
+		for _, l := range listeners {
+			l.write(wire.Notice{Crosstalk: wire.Event{Hub: wire.HubConnected}})
 		}
 	case "nack":
 		if ch := d.takePending(frame.Ref); ch != nil {

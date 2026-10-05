@@ -436,10 +436,10 @@ func TestMovingToAnotherNetworkRemakesTheConnection(t *testing.T) {
 	addrs := "192.168.1.20/24"
 	hub, machines := start(t, func(p *pace) {
 		p.watchEvery = 5 * time.Millisecond
-		p.localAddrs = func() string {
+		p.localAddrs = func() (string, error) {
 			mu.Lock()
 			defer mu.Unlock()
-			return addrs
+			return addrs, nil
 		}
 	})
 	machines["lychee"].listen("tagteam", func(wire.Delivery) wire.Reply { return wire.Reply{} })
@@ -456,5 +456,34 @@ func TestMovingToAnotherNetworkRemakesTheConnection(t *testing.T) {
 	eventually(t, "a send working again", func() bool { return sendWorks(machines["macbook"]) })
 	if n := hub.connected("macbook"); n != 2 {
 		t.Fatalf("connected %d times for one change of network", n)
+	}
+}
+
+func TestOnlyRoutableAddressesCountAsTheNetwork(t *testing.T) {
+	parse := func(cidrs ...string) []net.Addr {
+		var addrs []net.Addr
+		for _, cidr := range cidrs {
+			ip, ipnet, err := net.ParseCIDR(cidr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ipnet.IP = ip
+			addrs = append(addrs, ipnet)
+		}
+		return addrs
+	}
+	home := []string{"192.168.1.20/24", "2001:db8:1::5/64", "fd00::5/64"}
+	base := routable(parse(home...))
+	if strings.Count(base, " ") != len(home)-1 {
+		t.Errorf("not every address counted, private ones included: %q", base)
+	}
+	// What macOS adds and drops by itself changes nothing.
+	local := []string{"127.0.0.1/8", "::1/128", "fe80::1/64", "169.254.3.4/16"}
+	if got := routable(parse(append(home, local...)...)); got != base {
+		t.Errorf("loopback and link-local counted: %q", got)
+	}
+	// Another network does.
+	if routable(parse("192.168.1.21/24", "2001:db8:1::5/64", "fd00::5/64")) == base {
+		t.Error("a new private address did not count")
 	}
 }

@@ -466,20 +466,23 @@ func TestMovingToAnotherNetworkRemakesTheConnection(t *testing.T) {
 func TestAListenerHearsWhenTheHubIsBack(t *testing.T) {
 	hub, machines := start(t)
 	c, lines := machines["lychee"].dial(wire.Request{Op: "listen", Name: "tagteam"})
-	// So a notice that never comes fails the test rather than hanging it.
-	c.SetReadDeadline(time.Now().Add(5 * time.Second))
-	if !lines.Scan() || lines.Text() != `{"ok":true}` {
+	// So a line that never comes fails the test rather than hanging it.
+	scan := func() bool {
+		c.SetReadDeadline(time.Now().Add(5 * time.Second))
+		return lines.Scan()
+	}
+	if !scan() || lines.Text() != `{"ok":true}` {
 		t.Fatalf("listen: %s", lines.Text())
 	}
 	// Messages could not reach it before it listened, as if the hub had
 	// been away.
-	if !lines.Scan() || lines.Text() != `{"crosstalk":{"hub":"connected"}}` {
+	if !scan() || lines.Text() != `{"crosstalk":{"hub":"connected"}}` {
 		t.Fatalf("on listening: %s", lines.Text())
 	}
 
 	machines["lychee"].daemon.reconnect("a test")
 	eventually(t, "a second connection", func() bool { return hub.connected("lychee") >= 2 })
-	if !lines.Scan() || lines.Text() != `{"crosstalk":{"hub":"connected"}}` {
+	if !scan() || lines.Text() != `{"crosstalk":{"hub":"connected"}}` {
 		t.Fatalf("after reconnecting: %s", lines.Text())
 	}
 	// By then the other machines are back on the list, so a catch-up that
@@ -495,7 +498,7 @@ func TestAListenerHearsWhenTheHubIsBack(t *testing.T) {
 		return slices.Contains(res.Sent, "lychee")
 	})
 	var msg wire.Delivery
-	if !lines.Scan() || json.Unmarshal(lines.Bytes(), &msg) != nil || msg.From != "macbook" {
+	if !scan() || json.Unmarshal(lines.Bytes(), &msg) != nil || msg.From != "macbook" {
 		t.Fatalf("after the notice: %s", lines.Text())
 	}
 }

@@ -1,0 +1,16 @@
+name = "crosstalk-hub"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+# The hub is only reachable through a custom domain you attach to it (see
+# README), never a generated workers.dev or preview address.
+workers_dev = false
+preview_urls = false
+
+[[durable_objects.bindings]]
+name = "HUB"
+class_name = "Hub"
+
+# Applied tags are history: never edit one in place, add a new tag instead.
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Hub"]

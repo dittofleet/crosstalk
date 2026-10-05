@@ -66,7 +66,7 @@ type pace struct {
 	// A gap this long between two looks means the machine was asleep.
 	sleptAfter time.Duration
 	// This machine's addresses, as one string to compare.
-	localAddrs func() string
+	localAddrs func() (string, error)
 }
 
 var defaultPace = pace{
@@ -279,7 +279,7 @@ func (d *Daemon) watch(ctx context.Context) {
 	// clock stops while the machine sleeps, which is exactly the gap this
 	// is looking for.
 	last := time.Now().Round(0)
-	addrs := d.pace.localAddrs()
+	addrs, _ := d.pace.localAddrs()
 	var changed time.Time
 	for {
 		select {
@@ -292,11 +292,16 @@ func (d *Daemon) watch(ctx context.Context) {
 		last = now
 		d.expire()
 		if gap > d.pace.sleptAfter {
-			addrs, changed = d.pace.localAddrs(), time.Time{}
+			changed = time.Time{}
+			if current, err := d.pace.localAddrs(); err == nil {
+				addrs = current
+			}
 			d.reconnect(fmt.Sprintf("this machine was asleep for %s", gap.Round(time.Second)))
 			continue
 		}
-		if current := d.pace.localAddrs(); current != addrs {
+		// A look that fails says nothing about the network, so it is
+		// not taken for a move to one with no addresses.
+		if current, err := d.pace.localAddrs(); err == nil && current != addrs {
 			addrs, changed = current, now
 		}
 		if !changed.IsZero() && now.Sub(changed) >= settle {
@@ -321,17 +326,29 @@ func (d *Daemon) reconnect(why string) {
 	}
 }
 
-// interfaceAddrs lists this machine's addresses. Loopback is left out: it never changes and says nothing about the network.
-func interfaceAddrs() string {
+// interfaceAddrs lists this machine's addresses that say which network it
+// is on.
+func interfaceAddrs() (string, error) {
 	all, err := net.InterfaceAddrs()
 	if err != nil {
-		return ""
+		return "", err
 	}
+	return routable(all), nil
+}
+
+// routable keeps the addresses that can reach past this machine's own
+// link, private ones included, as one string to compare. Loopback never
+// changes. Link-local addresses come and go by themselves: macOS adds and
+// drops one on llw0, the interface for AirDrop and Continuity, every few
+// minutes, and none of them can reach the hub.
+func routable(all []net.Addr) string {
 	var addrs []string
 	for _, addr := range all {
-		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			addrs = append(addrs, ipnet.String())
+		ipnet, ok := addr.(*net.IPNet)
+		if !ok || !ipnet.IP.IsGlobalUnicast() {
+			continue
 		}
+		addrs = append(addrs, ipnet.String())
 	}
 	slices.Sort(addrs)
 	return strings.Join(addrs, " ")

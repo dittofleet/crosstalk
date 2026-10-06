@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	clikit "github.com/dittofleet/go-cli-kit"
 	"golang.org/x/term"
 
 	"github.com/dittofleet/crosstalk/internal/config"
@@ -96,7 +97,7 @@ func Join(args []string) error {
 	}
 	// Installing again restarts a daemon that is already running, which is
 	// how it comes to use what was just saved.
-	binary, err := resolveExecutable()
+	binary, err := clikit.Executable()
 	if err == nil {
 		err = service.Install(binary)
 	}

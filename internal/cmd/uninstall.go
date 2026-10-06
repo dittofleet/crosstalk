@@ -8,10 +8,11 @@ import (
 	"os"
 	"strings"
 
+	clikit "github.com/dittofleet/go-cli-kit"
+	"github.com/dittofleet/go-cli-kit/xdg"
 	"golang.org/x/term"
 
 	"github.com/dittofleet/crosstalk/internal/service"
-	"github.com/dittofleet/crosstalk/internal/xdg"
 )
 
 const uninstallUsage = "usage: crosstalk uninstall [--yes]"
@@ -19,21 +20,21 @@ const uninstallUsage = "usage: crosstalk uninstall [--yes]"
 // Uninstall stops the daemon and removes the service, the values, the
 // config and the binary. The binary goes last, so a failure leaves a tool
 // to retry with.
-func Uninstall(args []string, version string) error {
+func Uninstall(args []string, a clikit.App) error {
 	yes := len(args) == 1 && args[0] == "--yes"
 	if len(args) > 0 && !yes {
 		return errors.New(uninstallUsage)
 	}
-	if version == "dev" {
+	if a.IsDev() {
 		return errors.New("cannot uninstall a dev build")
 	}
 
-	binaryPath, err := resolveExecutable()
+	binaryPath, err := clikit.Executable()
 	if err != nil {
 		return fmt.Errorf("cannot determine binary path: %w", err)
 	}
-	configDir := xdg.ConfigDir("crosstalk")
-	dataDir := xdg.DataDir("crosstalk")
+	configDir := xdg.ConfigDir(a.Name)
+	dataDir := xdg.DataDir(a.Name)
 
 	fmt.Println("This will stop the daemon and remove:")
 	fmt.Printf("  - Binary:  %s\n", binaryPath)

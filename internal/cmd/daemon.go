@@ -8,6 +8,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	clikit "github.com/dittofleet/go-cli-kit"
+
 	"github.com/dittofleet/crosstalk/internal/config"
 	"github.com/dittofleet/crosstalk/internal/daemon"
 	"github.com/dittofleet/crosstalk/internal/service"
@@ -22,7 +24,7 @@ func Start(args []string) error {
 	if _, err := config.Load(); err != nil {
 		return err
 	}
-	binary, err := resolveExecutable()
+	binary, err := clikit.Executable()
 	if err != nil {
 		return err
 	}

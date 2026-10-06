@@ -15,8 +15,10 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/dittofleet/go-cli-kit/xdg"
+
+	"github.com/dittofleet/crosstalk/internal/app"
 	"github.com/dittofleet/crosstalk/internal/wire"
-	"github.com/dittofleet/crosstalk/internal/xdg"
 )
 
 const SchemaVersion = 1
@@ -36,17 +38,17 @@ type Config struct {
 }
 
 func Path() string {
-	return filepath.Join(xdg.ConfigDir("crosstalk"), "config.json")
+	return filepath.Join(xdg.ConfigDir(app.Name), "config.json")
 }
 
 // SocketPath is where the daemon listens for programs on this machine.
 func SocketPath() string {
-	return filepath.Join(xdg.DataDir("crosstalk"), "sock")
+	return filepath.Join(xdg.DataDir(app.Name), "sock")
 }
 
 // ValuesPath is where the daemon keeps posted and synced values.
 func ValuesPath() string {
-	return filepath.Join(xdg.DataDir("crosstalk"), "values.json")
+	return filepath.Join(xdg.DataDir(app.Name), "values.json")
 }
 
 // ErrNotJoined is returned by Load on a machine that has not run join.

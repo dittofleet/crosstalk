@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"os"
 
+	clikit "github.com/dittofleet/go-cli-kit"
+	"github.com/dittofleet/go-cli-kit/updatecheck"
+
+	"github.com/dittofleet/crosstalk/internal/app"
 	"github.com/dittofleet/crosstalk/internal/cmd"
-	"github.com/dittofleet/crosstalk/internal/update"
 )
 
 var errUnknownCommand = errors.New("unknown command")
@@ -70,7 +73,8 @@ func main() {
 		fmt.Print(usage)
 		os.Exit(0)
 	}
-	if err := dispatch(args); err != nil {
+	crosstalk := app.New(version)
+	if err := dispatch(crosstalk, args); err != nil {
 		switch {
 		case errors.Is(err, errUnknownCommand):
 			fmt.Print(usage)
@@ -81,14 +85,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// After an update the running binary is still the old version, and
-	// would announce the one just installed.
-	if args[0] != "uninstall" && args[0] != "update" {
-		update.MaybeCheck(version)
-	}
+	updatecheck.MaybeCheck(crosstalk, args[0])
 }
 
-func dispatch(args []string) error {
+func dispatch(crosstalk clikit.App, args []string) error {
 	switch args[0] {
 	case "send":
 		return cmd.Send(args[1:])
@@ -121,9 +121,9 @@ func dispatch(args []string) error {
 	case "remove":
 		return cmd.Remove(args[1:])
 	case "update":
-		return cmd.SelfUpdate(version)
+		return cmd.Update(crosstalk)
 	case "uninstall":
-		return cmd.Uninstall(args[1:], version)
+		return cmd.Uninstall(args[1:], crosstalk)
 	case "version", "--version", "-v":
 		fmt.Println(version)
 		return nil

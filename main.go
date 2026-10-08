@@ -74,6 +74,7 @@ func main() {
 		os.Exit(0)
 	}
 	crosstalk := app.New(version)
+	crosstalk.AfterUpdate = cmd.RestartDaemon
 	if err := dispatch(crosstalk, args); err != nil {
 		switch {
 		case errors.Is(err, errUnknownCommand):

@@ -135,9 +135,10 @@ Macs you still have.
 
 ## Updating and uninstalling
 
-`crosstalk update` installs the latest release and restarts the daemon. Once
-a day, crosstalk prints a hint when one is out. It skips the check when `CI`
-or `CROSSTALK_NO_UPDATE_CHECK` is set or stderr is not a terminal.
+crosstalk updates itself: at most once a day, after a command, it installs
+a newer release if one is out and restarts the daemon. It skips the check
+when `CI` or `CROSSTALK_NO_UPDATE_CHECK` is set or stderr is not a terminal.
+`crosstalk update` does the same right away.
 
 `crosstalk uninstall` stops the daemon and removes the binary, config and
 values, after asking (`--yes` skips the prompt). The hub is untouched.

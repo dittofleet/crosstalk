@@ -52,7 +52,7 @@ one of your devices.
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/dittofleet/crosstalk/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/dittofleet/.github/main/install.sh | sh -s crosstalk
 ```
 
 Installs the latest release to `~/.local/bin/crosstalk` (override with

@@ -124,6 +124,8 @@ func dispatch(crosstalk clikit.App, args []string) error {
 		return cmd.Update(crosstalk)
 	case "uninstall":
 		return cmd.Uninstall(args[1:], crosstalk)
+	case "postinstall":
+		return cmd.Postinstall(crosstalk)
 	case "version", "--version", "-v":
 		fmt.Println(version)
 		return nil

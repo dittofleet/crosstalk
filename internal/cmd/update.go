@@ -10,23 +10,26 @@ import (
 	"github.com/dittofleet/crosstalk/internal/service"
 )
 
-// Update installs the latest release over this binary and restarts the
-// daemon, so the one that keeps running is the new one.
+// Update installs the latest release over this binary.
 func Update(a clikit.App) error {
 	// Releases are built for macOS only, so anywhere else the download
 	// would 404.
 	if runtime.GOOS != "darwin" {
 		return fmt.Errorf("unsupported platform: %s/%s", runtime.GOOS, runtime.GOARCH)
 	}
-	updated, err := selfupdate.Run(a)
-	if err != nil || !updated {
-		return err
+	_, err := selfupdate.Run(a)
+	return err
+}
+
+// RestartDaemon runs after every update, by `update` or automatic, so the
+// daemon that keeps running is the new one.
+func RestartDaemon() error {
+	if !service.Installed() {
+		return nil
 	}
-	if service.Installed() {
-		if err := service.Restart(); err != nil {
-			return fmt.Errorf("updated, but the daemon is still the old version: %w", err)
-		}
-		fmt.Println("Restarted the daemon.")
+	if err := service.Restart(); err != nil {
+		return fmt.Errorf("the daemon is still the old version: %w", err)
 	}
+	fmt.Println("Restarted the daemon.")
 	return nil
 }

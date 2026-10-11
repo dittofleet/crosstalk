@@ -105,7 +105,7 @@ func Join(args []string) error {
 		fmt.Fprintf(os.Stderr, "Could not start the daemon in the background: %v\nRun `crosstalk daemon` to start it yourself.\n", err)
 		return nil
 	}
-	fmt.Println("The daemon is running, and starts again whenever you log in.")
+	fmt.Println("The daemon is running in the background.")
 	return nil
 }
 

@@ -22,7 +22,7 @@ func Uninstall(args []string, a clikit.App) error {
 	}
 	return uninstall.Run(a, yes, uninstall.Plan{
 		Items: []uninstall.Item{
-			{Label: "Daemon", Note: "stopped, and no longer started at login", Remove: func(string) error { return service.Remove() }},
+			{Label: "Daemon", Note: "stopped, and no longer started on its own", Remove: func(string) error { return service.Remove() }},
 			{Label: "Values", Path: xdg.DataDir(a.Name), Remove: os.RemoveAll},
 			{Label: "Config", Path: xdg.ConfigDir(a.Name), Note: "hub address and key", Remove: os.RemoveAll},
 		},

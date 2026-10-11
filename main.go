@@ -7,6 +7,7 @@ import (
 	"os"
 
 	clikit "github.com/dittofleet/go-cli-kit"
+	"github.com/dittofleet/go-cli-kit/selfupdate"
 	"github.com/dittofleet/go-cli-kit/updatecheck"
 
 	"github.com/dittofleet/crosstalk/internal/app"
@@ -122,7 +123,8 @@ func dispatch(crosstalk clikit.App, args []string) error {
 	case "remove":
 		return cmd.Remove(args[1:])
 	case "update":
-		return cmd.Update(crosstalk)
+		_, err := selfupdate.Run(crosstalk)
+		return err
 	case "uninstall":
 		return cmd.Uninstall(args[1:], crosstalk)
 	case "postinstall":

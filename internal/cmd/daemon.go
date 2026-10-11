@@ -31,7 +31,7 @@ func Start(args []string) error {
 	if err := service.Install(binary); err != nil {
 		return err
 	}
-	fmt.Println("The daemon is running, and starts again whenever you log in.")
+	fmt.Println("The daemon is running in the background.")
 	return nil
 }
 

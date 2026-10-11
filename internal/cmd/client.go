@@ -71,9 +71,9 @@ type patience struct {
 	retry, giveUp time.Duration
 }
 
-// A restart takes seconds, or ten when launchd holds back a daemon that
-// has just exited. A daemon gone for longer than this was stopped on
-// purpose, or cannot start, and waiting on would hide that.
+// A restart takes seconds, or ten when launchd or systemd holds back a
+// daemon that has just exited. A daemon gone for longer than this was
+// stopped on purpose, or cannot start, and waiting on would hide that.
 var restartPatience = patience{retry: time.Second, giveUp: time.Minute}
 
 // stayConnected runs once, and again each time the daemon goes away, so a

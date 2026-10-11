@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,10 +19,13 @@ func unitPath() string {
 
 func systemctl(args ...string) error {
 	out, err := exec.Command("systemctl", append([]string{"--user"}, args...)...).CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("systemctl %s: %s", strings.Join(args, " "), strings.TrimSpace(string(out)))
+	if err == nil {
+		return nil
 	}
-	return nil
+	if msg := strings.TrimSpace(string(out)); msg != "" {
+		err = errors.New(msg)
+	}
+	return fmt.Errorf("systemctl %s: %w", strings.Join(args, " "), err)
 }
 
 // quote makes s one word to systemd, with nothing in it read as a
@@ -60,6 +64,15 @@ RestartSec=10
 WantedBy=default.target
 `, strings.ReplaceAll(quote(binary), "$", "$$"), env.String())
 
+	// A user's services stop when their last session ends, unless they
+	// linger. A Raspberry Pi reached over SSH has no session most of the
+	// time, and lingering also starts the daemon at boot. It goes first, as
+	// it also starts the user's service manager where none is running yet.
+	linger, _ := exec.Command("loginctl", "show-user", strconv.Itoa(os.Getuid()), "--property=Linger", "--value").Output()
+	if strings.TrimSpace(string(linger)) != "yes" && exec.Command("loginctl", "enable-linger").Run() != nil {
+		fmt.Fprintln(os.Stderr, "The daemon stops when you log out. To keep it running, run `sudo loginctl enable-linger $USER`.")
+	}
+
 	if err := os.MkdirAll(filepath.Dir(unitPath()), 0o755); err != nil {
 		return err
 	}
@@ -68,15 +81,11 @@ WantedBy=default.target
 	}
 	for _, args := range [][]string{{"daemon-reload"}, {"enable", unit}, {"restart", unit}} {
 		if err := systemctl(args...); err != nil {
+			// A unit left behind would count as installed, and every
+			// update would then fail to restart it.
+			os.Remove(unitPath())
 			return err
 		}
-	}
-	// A user's services stop when their last session ends, unless they
-	// linger. A Raspberry Pi reached over SSH has no session most of the
-	// time, and lingering also starts the daemon at boot.
-	linger, _ := exec.Command("loginctl", "show-user", strconv.Itoa(os.Getuid()), "--property=Linger", "--value").Output()
-	if strings.TrimSpace(string(linger)) != "yes" && exec.Command("loginctl", "enable-linger").Run() != nil {
-		fmt.Fprintln(os.Stderr, "The daemon stops when you log out. To keep it running, run `sudo loginctl enable-linger $USER`.")
 	}
 	return nil
 }
@@ -94,9 +103,8 @@ func Remove() error {
 	}
 	// A daemon still running afterwards would write its files back after
 	// they are removed.
-	stop := systemctl("disable", "--now", unit)
-	if stop != nil && systemctl("is-active", "--quiet", unit) == nil {
-		return stop
+	if err := systemctl("disable", "--now", unit); err != nil {
+		return err
 	}
 	if err := os.Remove(unitPath()); err != nil {
 		return err

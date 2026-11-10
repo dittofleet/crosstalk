@@ -97,6 +97,8 @@ type Daemon struct {
 
 	// Holds one value when the connection should be remade at once.
 	nudge chan string
+	// Ends Run, for a program on this machine that asks the daemon to stop.
+	stop context.CancelFunc
 
 	mu      sync.Mutex
 	conn    *websocket.Conn // nil while not connected
@@ -141,8 +143,10 @@ func New(cfg *config.Config) (*Daemon, error) {
 	}, nil
 }
 
-// Run serves until ctx is done.
+// Run serves until ctx is done, or until it is asked to stop.
 func (d *Daemon) Run(ctx context.Context) error {
+	ctx, d.stop = context.WithCancel(ctx)
+	defer d.stop()
 	ln, err := listenLocal(config.SocketPath())
 	if err != nil {
 		return err

@@ -1,6 +1,7 @@
 // Package service keeps the daemon running in the background: as a launchd
 // agent on macOS and a systemd user service on Linux, started on its own
-// and restarted if it dies.
+// and restarted if it dies. On Windows it is started at login, and not
+// restarted.
 package service
 
 import "os"

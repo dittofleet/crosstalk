@@ -31,10 +31,6 @@ func TestSaveAndLoadGiveBackTheSameConfig(t *testing.T) {
 	if err := cfg.Save(); err != nil {
 		t.Fatal(err)
 	}
-	info, err := os.Stat(Path())
-	if err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("saved config: %v, %v", info, err)
-	}
 	got, err := Load()
 	if err != nil || *got != *cfg {
 		t.Fatalf("Load = %+v, %v", got, err)

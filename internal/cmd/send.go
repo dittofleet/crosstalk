@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -70,6 +71,8 @@ func readBody(arg string) (json.RawMessage, error) {
 		if data, err = io.ReadAll(io.LimitReader(os.Stdin, wire.MaxBody+1)); err != nil {
 			return nil, err
 		}
+		// Windows PowerShell puts a byte order mark before what it pipes.
+		data = bytes.TrimPrefix(data, []byte("\xef\xbb\xbf"))
 	}
 	if !json.Valid(data) {
 		return nil, errors.New(`the body must be JSON, e.g. '{"do":"refresh"}' or '"some text"'`)

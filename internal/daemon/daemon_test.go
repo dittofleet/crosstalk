@@ -195,8 +195,7 @@ func newFleet(t *testing.T) *fleet {
 // given, changes the daemon's pace before it starts.
 func (f *fleet) add(name string, tune ...func(*pace)) *machine {
 	f.t.Helper()
-	// Short, because a socket path has little room.
-	dir, err := os.MkdirTemp("/tmp", "ct")
+	dir, err := os.MkdirTemp(shortTemp, "ct")
 	if err != nil {
 		f.t.Fatal(err)
 	}
@@ -212,6 +211,7 @@ func (f *fleet) add(name string, tune ...func(*pace)) *machine {
 		f.t.Fatal(err)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	d.stop = cancel
 	m := &machine{t: f.t, daemon: d, socket: dir + "/sock", stop: cancel}
 	ln, err := listenLocal(m.socket)
 	if err != nil {
@@ -559,4 +559,18 @@ func TestOnlyRoutableAddressesCountAsTheNetwork(t *testing.T) {
 	if routable(parse("192.168.1.21/24", "2001:db8:1::5/64", "fd00::5/64")) == base {
 		t.Error("a new private address did not count")
 	}
+}
+
+// Windows has no signal to stop a daemon with, so it is asked.
+func TestADaemonAskedToStopDoes(t *testing.T) {
+	hub, machines := start(t)
+	res := machines["lychee"].ask(wire.Request{Op: "stop"})
+	if !res.OK || res.PID != os.Getpid() {
+		t.Fatalf("stop = %+v", res)
+	}
+	eventually(t, "lychee leaving the hub", func() bool {
+		hub.mu.Lock()
+		defer hub.mu.Unlock()
+		return hub.conns["lychee"] == nil
+	})
 }

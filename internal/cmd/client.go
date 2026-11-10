@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dittofleet/crosstalk/internal/config"
+	"github.com/dittofleet/crosstalk/internal/service"
 	"github.com/dittofleet/crosstalk/internal/wire"
 )
 
@@ -36,7 +37,14 @@ func connect(req wire.Request) (net.Conn, *bufio.Scanner, error) {
 	}
 	c, err := net.Dial("unix", config.SocketPath())
 	if err != nil {
-		return nil, nil, errors.New("the crosstalk daemon is not running, start it with `crosstalk daemon`")
+		// With the background service set up, `start` brings the daemon
+		// back. On Windows nothing else does before the next login, so
+		// this is where its user finds out.
+		how := "crosstalk daemon"
+		if service.Installed() {
+			how = "crosstalk start"
+		}
+		return nil, nil, fmt.Errorf("the crosstalk daemon is not running, start it with `%s`", how)
 	}
 	if err := wire.WriteLine(c, req); err != nil {
 		c.Close()

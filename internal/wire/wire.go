@@ -154,7 +154,7 @@ const (
 type Request struct {
 	// Messages: "send", "listen". Posted values: "post", "unpost", "read".
 	// Synced values: "set", "unset", "get". Both: "watch". The list of
-	// machines: "devices", "remove".
+	// machines: "devices", "remove". The daemon itself: "stop".
 	Op string `json:"op"`
 	// To is a device name. "*" is every other connected device for a send,
 	// which then waits for no reply, and every device for a read.
@@ -183,6 +183,8 @@ type Response struct {
 	// is not written again or sent anywhere.
 	Changed *bool   `json:"changed,omitempty"`
 	Entries []Entry `json:"entries,omitempty"`
+	// PID is the daemon's process, in the answer to a stop.
+	PID int `json:"pid,omitempty"`
 }
 
 // Entry is one value as a program sees it: in the answer to a read or get,

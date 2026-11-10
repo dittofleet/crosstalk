@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dittofleet/crosstalk/internal/config"
 	"github.com/dittofleet/crosstalk/internal/wire"
 )
 
@@ -118,9 +119,34 @@ func (d *Daemon) handle(ctx context.Context, c net.Conn) {
 			return
 		}
 		wire.WriteLine(c, wire.Response{OK: true})
+	case "stop":
+		// How the daemon is stopped on Windows, which has no signal to ask
+		// with. The answer says which process to wait for.
+		wire.WriteLine(c, wire.Response{OK: true, PID: os.Getpid()})
+		d.stop()
 	default:
 		wire.WriteLine(c, refusal(wire.ErrBadRequest, fmt.Sprintf("unknown op %q", req.Op)))
 	}
+}
+
+// Stop asks the daemon running on this machine to stop, and returns its
+// process id, for a caller that has to wait until it has gone. With no
+// daemon running it returns 0.
+func Stop() (pid int, err error) {
+	c, err := net.Dial("unix", config.SocketPath())
+	if err != nil {
+		return 0, nil
+	}
+	defer c.Close()
+	if err := wire.WriteLine(c, wire.Request{Op: "stop"}); err != nil {
+		return 0, err
+	}
+	lines := wire.NewScanner(c)
+	var res wire.Response
+	if !lines.Scan() || json.Unmarshal(lines.Bytes(), &res) != nil || !res.OK {
+		return 0, errors.New("the running daemon did not agree to stop")
+	}
+	return res.PID, nil
 }
 
 func refusal(code, message string) wire.Response {

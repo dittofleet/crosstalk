@@ -2,7 +2,7 @@
 
 # crosstalk
 
-Lets the apps on your machines, macOS and Linux, talk to each other: ask
+Lets the apps on your machines, macOS, Linux and Windows, talk to each other: ask
 an app on another machine to refresh, share each machine's status, keep a
 setting the same everywhere. Small JSON, for orchestration, not files or
 streams.
@@ -56,6 +56,12 @@ it is one of your devices.
 curl -fsSL https://raw.githubusercontent.com/dittofleet/.github/main/install.sh | sh -s crosstalk
 ```
 
+On Windows, in PowerShell:
+
+```powershell
+& ([scriptblock]::Create((irm https://raw.githubusercontent.com/dittofleet/.github/main/install.ps1))) crosstalk
+```
+
 Installs the latest release to `~/.local/bin/crosstalk` (override with
 `CROSSTALK_INSTALL_DIR`), asks for the hub's address and the key, and
 starts the daemon in the background. The machine joins under its own name
@@ -67,10 +73,16 @@ starts the daemon in the background. The machine joins under its own name
   systemd user service, logging to `journalctl --user-unit crosstalk`. It
   also turns on lingering for your user, so the daemon starts at boot and
   keeps running after you log out. Where that needs root, it says so.
+- **Windows** (x64): one of your startup apps, listed as `crosstalkw`,
+  the program that starts it at login with no window. It logs to
+  `~\.local\share\crosstalk\daemon.log`. The install also adds
+  `~\.local\bin` to your PATH. Nothing starts the daemon again if it stops
+  before your next login: `crosstalk start` does.
 
 `crosstalk join <hub url>` joins again, with `--name` for another name.
-`CROSSTALK_HUB` and `CROSSTALK_KEY` set on the `sh` side of the pipe skip
-the questions.
+`CROSSTALK_HUB` and `CROSSTALK_KEY` set on the `sh` side of the pipe, or
+as `$env:CROSSTALK_HUB` and `$env:CROSSTALK_KEY` in PowerShell, skip the
+questions.
 
 ## Usage
 
@@ -95,12 +107,18 @@ crosstalk devices                             # your machines, and which are con
 A name is any string. `app:channel` keeps them tidy, but it is only a
 convention: `lookout` and `lookout:disk-report` are unrelated.
 
+On Windows, JSON given as an argument loses its quotes in Windows
+PowerShell 5.1 and in cmd, so `'{"do":"refresh"}'` arrives as
+`{do:refresh}`. PowerShell 7.3 and later pass it as written. Anywhere,
+piping it in works: `'{"do":"refresh"}' | crosstalk send lychee tagteam -`.
+
 **Messages.** A send waits for the reply (10 seconds, or `--timeout`) and
 fails clearly when the machine is not connected, nothing there is
 listening, or nothing answered. Nothing is queued, so a message for a
 machine that is asleep fails rather than arriving when it wakes.
 `listen --run` runs the command once per message with the body on stdin,
-and what it prints is the reply. Plain `listen` prints each message as a
+and what it prints is the reply (on Windows the command is a program or a
+`.cmd` file, so a PowerShell script goes through `powershell -File`). Plain `listen` prints each message as a
 line of JSON and takes replies as lines on stdin,
 `{"id": <its id>, "body": <any JSON>}`.
 

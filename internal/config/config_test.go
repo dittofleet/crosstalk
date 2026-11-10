@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -32,7 +33,8 @@ func TestSaveAndLoadGiveBackTheSameConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(Path())
-	if err != nil || info.Mode().Perm() != 0o600 {
+	// Windows has no such permissions: the user's own folder keeps others out.
+	if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o600) {
 		t.Fatalf("saved config: %v, %v", info, err)
 	}
 	got, err := Load()

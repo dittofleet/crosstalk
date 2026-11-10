@@ -116,14 +116,20 @@ func readKey() (string, error) {
 	if key := os.Getenv("CROSSTALK_KEY"); key != "" {
 		return key, nil
 	}
-	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	noTerminal := errors.New("no terminal to ask for the key on, set CROSSTALK_KEY")
+	in, err := os.OpenFile(ttyIn, os.O_RDWR, 0)
 	if err != nil {
-		return "", errors.New("no terminal to ask for the key on, set CROSSTALK_KEY")
+		return "", noTerminal
 	}
-	defer tty.Close()
-	fmt.Fprint(tty, "Key: ")
-	key, err := term.ReadPassword(int(tty.Fd()))
-	fmt.Fprintln(tty)
+	defer in.Close()
+	out, err := os.OpenFile(ttyOut, os.O_WRONLY, 0)
+	if err != nil {
+		return "", noTerminal
+	}
+	defer out.Close()
+	fmt.Fprint(out, "Key: ")
+	key, err := term.ReadPassword(int(in.Fd()))
+	fmt.Fprintln(out)
 	if err != nil {
 		return "", err
 	}

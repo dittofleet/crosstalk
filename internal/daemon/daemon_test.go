@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -196,13 +195,7 @@ func newFleet(t *testing.T) *fleet {
 // given, changes the daemon's pace before it starts.
 func (f *fleet) add(name string, tune ...func(*pace)) *machine {
 	f.t.Helper()
-	// Short, because a socket path has little room. Windows has no /tmp,
-	// and its own temp directory is short enough.
-	tmp := "/tmp"
-	if runtime.GOOS == "windows" {
-		tmp = ""
-	}
-	dir, err := os.MkdirTemp(tmp, "ct")
+	dir, err := os.MkdirTemp(shortTemp, "ct")
 	if err != nil {
 		f.t.Fatal(err)
 	}

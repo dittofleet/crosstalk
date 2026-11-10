@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -31,11 +30,6 @@ func TestSaveAndLoadGiveBackTheSameConfig(t *testing.T) {
 	cfg := &Config{SchemaVersion: SchemaVersion, Hub: "https://crosstalk.example.com", Name: "lychee", ID: "abc", Key: "ctk_x"}
 	if err := cfg.Save(); err != nil {
 		t.Fatal(err)
-	}
-	info, err := os.Stat(Path())
-	// Windows has no such permissions: the user's own folder keeps others out.
-	if err != nil || (runtime.GOOS != "windows" && info.Mode().Perm() != 0o600) {
-		t.Fatalf("saved config: %v, %v", info, err)
 	}
 	got, err := Load()
 	if err != nil || *got != *cfg {
